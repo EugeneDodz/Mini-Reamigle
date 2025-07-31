@@ -53,13 +53,19 @@ function createPeerConnection() {
   peerConnection = new RTCPeerConnection(servers);
 
   peerConnection.ontrack = async (event) => {
+    const stream = event.streams[0];
+
     if (event.track.kind === "video") {
-      remoteVideo.srcObject = event.streams[0];
-      remoteVideo.style.display = "block";
-      await remoteVideo.play().catch(()=>{});
-    } else if (event.track.kind === "audio") {
-      remoteAudio.srcObject = event.streams[0];
-      await remoteAudio.play().catch(()=>{});
+      remoteVideo.srcObject = stream;
+      remoteVideo.playsInline = true;
+      await remoteVideo.play().catch(err => console.log("Video play blocked:", err));
+    } 
+    else if (event.track.kind === "audio") {
+      console.log("Remote audio tracks:", stream.getAudioTracks());
+      remoteAudio.srcObject = stream;
+      remoteAudio.autoplay = true;
+      remoteAudio.volume = 1.0;
+      await remoteAudio.play().catch(err => console.log("Audio play blocked:", err));
     }
   };
 
@@ -82,6 +88,8 @@ startBtn.onclick = async () => {
 
     localStream = await navigator.mediaDevices.getUserMedia(constraints);
     localVideo.srcObject = localStream;
+    localVideo.muted = true; // Prevent echo feedback
+    localVideo.playsInline = true;
     await localVideo.play().catch(()=>{});
     localVideo.style.display = mode === "video" ? "block" : "none";
 
@@ -104,3 +112,9 @@ function hangUp() {
   startBtn.disabled = false;
   hangupBtn.disabled = true;
 }
+
+// --- Manual Play Trigger (for autoplay restrictions) ---
+document.body.addEventListener("click", () => {
+  if (remoteAudio.srcObject) remoteAudio.play().catch(()=>{});
+  if (remoteVideo.srcObject) remoteVideo.play().catch(()=>{});
+});
