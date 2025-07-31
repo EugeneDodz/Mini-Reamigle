@@ -7,7 +7,7 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-app.use(express.static(path.join(__dirname, "public"))); // Serve HTML/CSS/JS
+app.use(express.static(path.join(__dirname, "public")));
 
 let waitingClient = null;
 
@@ -21,7 +21,6 @@ wss.on("connection", (ws) => {
     if (data.type === "ready") {
       ws.isReady = true;
       if (waitingClient && waitingClient.isReady) {
-        // ✅ Match both clients
         ws.partner = waitingClient;
         waitingClient.partner = ws;
 
@@ -37,7 +36,7 @@ wss.on("connection", (ws) => {
     else if (["offer", "answer", "ice-candidate"].includes(data.type)) {
       if (ws.partner) ws.partner.send(JSON.stringify(data));
     }
-  }); 
+  });
 
   ws.on("close", () => {
     console.log("Client disconnected");
