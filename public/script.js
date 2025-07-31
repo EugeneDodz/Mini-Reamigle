@@ -1,4 +1,7 @@
-const ws = new WebSocket(`ws://${window.location.host}`);
+// Use secure WebSocket if on HTTPS (Render)
+const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+const ws = new WebSocket(`${protocol}://${window.location.host}`);
+
 const startBtn = document.getElementById("startBtn");
 const hangupBtn = document.getElementById("hangupBtn");
 const localVideo = document.getElementById("localVideo");
@@ -52,7 +55,8 @@ function createPeerConnection() {
   peerConnection.ontrack = async (event) => {
     if (event.track.kind === "video") {
       remoteVideo.srcObject = event.streams[0];
-      await remoteVideo.play().catch(()=>{}); // Fix autoplay issue
+      remoteVideo.style.display = "block";
+      await remoteVideo.play().catch(()=>{});
     } else if (event.track.kind === "audio") {
       remoteAudio.srcObject = event.streams[0];
       await remoteAudio.play().catch(()=>{});
@@ -92,7 +96,6 @@ startBtn.onclick = async () => {
 
 // --- Hang Up ---
 hangupBtn.onclick = hangUp;
-
 function hangUp() {
   if (peerConnection) peerConnection.close();
   remoteVideo.srcObject = null;

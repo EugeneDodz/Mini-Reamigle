@@ -1,74 +1,57 @@
 const express = require("express");
-const { WebSocketServer } = require("ws");
 const http = require("http");
+const { WebSocketServer } = require("ws");
 const path = require("path");
-const os = require("os");
 
 const app = express();
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server });
 
-// --- View engine (EJS) ---
-app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "views"));
-
-// --- Static files ---
+// Serve static files from "public" folder
 app.use(express.static(path.join(__dirname, "public")));
 
-// --- Routes ---
+// Fallback route to serve index.html for "/"
 app.get("/", (req, res) => {
-  res.render("index"); // renders views/index.ejs
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// --- Create HTTP Server ---
-const server = http.createServer(app);
-
-// --- WebSocket Signaling ---
-const wss = new WebSocketServer({ server });
-let waitingUser = null;
+// WebSocket matchmaking logic
+let waitingClient = null;
 
 wss.on("connection", (ws) => {
-  ws.partner = null;
+  console.log("New client connected");
 
-  if (waitingUser) {
-    ws.partner = waitingUser;
-    waitingUser.partner = ws;
-    ws.send(JSON.stringify({ type: "match" }));
-    waitingUser.send(JSON.stringify({ type: "match" }));
-    waitingUser = null;
-  } else {
-    waitingUser = ws;
+  if (!waitingClient) {
+    waitingClient = ws;
     ws.send(JSON.stringify({ type: "waiting" }));
+  } else {
+    const partner = waitingClient;
+    waitingClient = null;
+
+    ws.partner = partner;
+    partner.partner = ws;
+
+    ws.send(JSON.stringify({ type: "match" }));
+    partner.send(JSON.stringify({ type: "match" }));
   }
 
-  ws.on("message", (msg) => {
-    if (ws.partner) ws.partner.send(msg);
+  ws.on("message", (message) => {
+    if (ws.partner && ws.partner.readyState === ws.OPEN) {
+      ws.partner.send(message);
+    }
   });
 
   ws.on("close", () => {
+    console.log("Client disconnected");
     if (ws.partner) {
       ws.partner.send(JSON.stringify({ type: "partner-disconnected" }));
       ws.partner.partner = null;
+    } else if (waitingClient === ws) {
+      waitingClient = null;
     }
-    if (waitingUser === ws) waitingUser = null;
   });
 });
 
-// --- Get LAN IP ---
-function getLocalIP() {
-  const interfaces = os.networkInterfaces();
-  for (let iface in interfaces) {
-    for (let config of interfaces[iface]) {
-      if (config.family === "IPv4" && !config.internal) return config.address;
-    }
-  }
-  return "localhost";
-}
-
-// --- Start HTTP Server ---
-const PORT = 3000;
-server.listen(PORT, "0.0.0.0", () => {  
-  const localIP = getLocalIP();
-  console.log("✅ Server running with HTTP");
-  console.log(`💻 Desktop: http://localhost:${PORT}`);
-  console.log(`📱 Mobile (same Wi-Fi): http://${localIP}:${PORT}`);
-  console.log("⚠️ Camera/mic may be blocked without HTTPS.");
-});
+// Use Render's dynamic port or fallback to 3000 locally
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
