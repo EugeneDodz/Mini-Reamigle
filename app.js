@@ -7,34 +7,35 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-app.use(express.static(path.join(__dirname, "public"))); // Serve your HTML/CSS/JS in "public"
+app.use(express.static(path.join(__dirname, "public"))); // Serve HTML/CSS/JS
 
 let waitingClient = null;
 
 wss.on("connection", (ws) => {
   console.log("New client connected");
-  
-  if (waitingClient) {
-    // Match with waiting client
-    ws.partner = waitingClient;
-    waitingClient.partner = ws;
-
-    ws.send(JSON.stringify({ type: "match" }));
-    waitingClient.send(JSON.stringify({ type: "match" }));
-
-    waitingClient = null;
-  } else {
-    // Put in waiting queue
-    waitingClient = ws;
-    ws.send(JSON.stringify({ type: "waiting" }));
-  }
+  ws.isReady = false;
 
   ws.on("message", (message) => {
     const data = JSON.parse(message);
-    console.log("Received:", data);
 
-    if (ws.partner) {
-      ws.partner.send(JSON.stringify(data));
+    if (data.type === "ready") {
+      ws.isReady = true;
+      if (waitingClient && waitingClient.isReady) {
+        // ✅ Match both clients
+        ws.partner = waitingClient;
+        waitingClient.partner = ws;
+
+        ws.send(JSON.stringify({ type: "match" }));
+        waitingClient.send(JSON.stringify({ type: "match" }));
+
+        waitingClient = null;
+      } else {
+        waitingClient = ws;
+        ws.send(JSON.stringify({ type: "waiting" }));
+      }
+    }
+    else if (["offer", "answer", "ice-candidate"].includes(data.type)) {
+      if (ws.partner) ws.partner.send(JSON.stringify(data));
     }
   });
 

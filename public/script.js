@@ -1,4 +1,3 @@
-// Use secure WebSocket if on HTTPS (Render)
 const protocol = window.location.protocol === "https:" ? "wss" : "ws";
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
@@ -12,7 +11,6 @@ const statusText = document.getElementById("status");
 let localStream, peerConnection;
 const servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
-// --- WebSocket Events ---
 ws.onmessage = async (msg) => {
   const data = JSON.parse(msg.data);
 
@@ -43,29 +41,27 @@ ws.onmessage = async (msg) => {
     catch (e) { console.error("ICE Error:", e); }
   } 
   else if (data.type === "partner-disconnected") {
-    statusText.textContent = "Partner disconnected.";
+    statusText.textContent = "Partner disconnected. Returning to waiting...";
     hangUp();
+    // Auto requeue
+    ws.send(JSON.stringify({ type: "ready" }));
   }
 };
 
-// --- Create Peer ---
 function createPeerConnection() {
   peerConnection = new RTCPeerConnection(servers);
 
   peerConnection.ontrack = async (event) => {
     const stream = event.streams[0];
-
     if (event.track.kind === "video") {
       remoteVideo.srcObject = stream;
       remoteVideo.playsInline = true;
-      await remoteVideo.play().catch(err => console.log("Video play blocked:", err));
-    } 
-    else if (event.track.kind === "audio") {
-      console.log("Remote audio tracks:", stream.getAudioTracks());
+      await remoteVideo.play().catch(()=>{});
+    } else if (event.track.kind === "audio") {
       remoteAudio.srcObject = stream;
       remoteAudio.autoplay = true;
       remoteAudio.volume = 1.0;
-      await remoteAudio.play().catch(err => console.log("Audio play blocked:", err));
+      await remoteAudio.play().catch(()=>{});
     }
   };
 
@@ -80,7 +76,6 @@ function addTracksToPeer(stream) {
   stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
 }
 
-// --- Start Call ---
 startBtn.onclick = async () => {
   try {
     const mode = document.querySelector('input[name="mode"]:checked').value;
@@ -88,10 +83,12 @@ startBtn.onclick = async () => {
 
     localStream = await navigator.mediaDevices.getUserMedia(constraints);
     localVideo.srcObject = localStream;
-    localVideo.muted = true; // Prevent echo feedback
+    localVideo.muted = true;
     localVideo.playsInline = true;
     await localVideo.play().catch(()=>{});
     localVideo.style.display = mode === "video" ? "block" : "none";
+
+    ws.send(JSON.stringify({ type: "ready" })); // ✅ Queue user
 
     startBtn.disabled = true;
     hangupBtn.disabled = false;
@@ -102,7 +99,6 @@ startBtn.onclick = async () => {
   }
 };
 
-// --- Hang Up ---
 hangupBtn.onclick = hangUp;
 function hangUp() {
   if (peerConnection) peerConnection.close();
@@ -113,7 +109,7 @@ function hangUp() {
   hangupBtn.disabled = true;
 }
 
-// --- Manual Play Trigger (for autoplay restrictions) ---
+// Autoplay workaround
 document.body.addEventListener("click", () => {
   if (remoteAudio.srcObject) remoteAudio.play().catch(()=>{});
   if (remoteVideo.srcObject) remoteVideo.play().catch(()=>{});
