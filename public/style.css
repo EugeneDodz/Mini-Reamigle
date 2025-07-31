@@ -67,3 +67,14 @@ button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+#mic-level {
+  margin-top: 10px;
+  font-size: 18px;
+}
+
+#mic-bar {
+  display: inline-block;
+  color: #0f0;
+  font-weight: bold;
+}

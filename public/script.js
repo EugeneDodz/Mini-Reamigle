@@ -7,6 +7,7 @@ const localVideo = document.getElementById("localVideo");
 const remoteVideo = document.getElementById("remoteVideo");
 const remoteAudio = document.getElementById("remoteAudio");
 const statusText = document.getElementById("status");
+const micBar = document.getElementById("mic-bar");
 
 let localStream, peerConnection;
 const servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
@@ -43,8 +44,7 @@ ws.onmessage = async (msg) => {
   else if (data.type === "partner-disconnected") {
     statusText.textContent = "Partner disconnected. Returning to waiting...";
     hangUp();
-    // Auto requeue
-    ws.send(JSON.stringify({ type: "ready" }));
+    ws.send(JSON.stringify({ type: "ready" })); // Auto requeue
   }
 };
 
@@ -55,9 +55,9 @@ function createPeerConnection() {
     const stream = event.streams[0];
     if (event.track.kind === "video") {
       remoteVideo.srcObject = stream;
-      remoteVideo.playsInline = true;
       await remoteVideo.play().catch(()=>{});
     } else if (event.track.kind === "audio") {
+      console.log("Remote audio received:", stream.getAudioTracks());
       remoteAudio.srcObject = stream;
       remoteAudio.autoplay = true;
       remoteAudio.volume = 1.0;
@@ -79,16 +79,22 @@ function addTracksToPeer(stream) {
 startBtn.onclick = async () => {
   try {
     const mode = document.querySelector('input[name="mode"]:checked').value;
-    const constraints = mode === "video" ? { video: true, audio: true } : { video: false, audio: true };
+    const constraints = { 
+      audio: { echoCancellation: true, noiseSuppression: true },
+      video: mode === "video"
+    };
 
     localStream = await navigator.mediaDevices.getUserMedia(constraints);
+    console.log("Local audio tracks:", localStream.getAudioTracks());
+
     localVideo.srcObject = localStream;
     localVideo.muted = true;
-    localVideo.playsInline = true;
     await localVideo.play().catch(()=>{});
     localVideo.style.display = mode === "video" ? "block" : "none";
 
-    ws.send(JSON.stringify({ type: "ready" })); // ✅ Queue user
+    setupMicIndicator(localStream); // 🎤 Mic Level Visualizer
+
+    ws.send(JSON.stringify({ type: "ready" })); // Enter queue
 
     startBtn.disabled = true;
     hangupBtn.disabled = false;
@@ -109,7 +115,25 @@ function hangUp() {
   hangupBtn.disabled = true;
 }
 
-// Autoplay workaround
+// 🎤 Mic Level Indicator
+function setupMicIndicator(stream) {
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const analyser = audioCtx.createAnalyser();
+  const source = audioCtx.createMediaStreamSource(stream);
+  source.connect(analyser);
+  const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+  function updateMic() {
+    analyser.getByteFrequencyData(dataArray);
+    const volume = dataArray.reduce((a, b) => a + b) / dataArray.length;
+    const level = Math.floor(volume / 15); // Scale level
+    micBar.textContent = "█".repeat(level) || "▁";
+    requestAnimationFrame(updateMic);
+  }
+  updateMic();
+}
+
+// Autoplay workaround (mobile browsers)
 document.body.addEventListener("click", () => {
   if (remoteAudio.srcObject) remoteAudio.play().catch(()=>{});
   if (remoteVideo.srcObject) remoteVideo.play().catch(()=>{});

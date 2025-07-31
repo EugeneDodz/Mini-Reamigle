@@ -37,7 +37,7 @@ wss.on("connection", (ws) => {
     else if (["offer", "answer", "ice-candidate"].includes(data.type)) {
       if (ws.partner) ws.partner.send(JSON.stringify(data));
     }
-  });
+  }); 
 
   ws.on("close", () => {
     console.log("Client disconnected");
