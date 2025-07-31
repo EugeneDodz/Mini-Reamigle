@@ -7,37 +7,34 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-// Serve static files from "public" folder
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public"))); // Serve your HTML/CSS/JS in "public"
 
-// Fallback route to serve index.html for "/"
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-// WebSocket matchmaking logic
 let waitingClient = null;
 
 wss.on("connection", (ws) => {
   console.log("New client connected");
-
-  if (!waitingClient) {
-    waitingClient = ws;
-    ws.send(JSON.stringify({ type: "waiting" }));
-  } else {
-    const partner = waitingClient;
-    waitingClient = null;
-
-    ws.partner = partner;
-    partner.partner = ws;
+  
+  if (waitingClient) {
+    // Match with waiting client
+    ws.partner = waitingClient;
+    waitingClient.partner = ws;
 
     ws.send(JSON.stringify({ type: "match" }));
-    partner.send(JSON.stringify({ type: "match" }));
+    waitingClient.send(JSON.stringify({ type: "match" }));
+
+    waitingClient = null;
+  } else {
+    // Put in waiting queue
+    waitingClient = ws;
+    ws.send(JSON.stringify({ type: "waiting" }));
   }
 
   ws.on("message", (message) => {
-    if (ws.partner && ws.partner.readyState === ws.OPEN) {
-      ws.partner.send(message);
+    const data = JSON.parse(message);
+    console.log("Received:", data);
+
+    if (ws.partner) {
+      ws.partner.send(JSON.stringify(data));
     }
   });
 
@@ -46,12 +43,10 @@ wss.on("connection", (ws) => {
     if (ws.partner) {
       ws.partner.send(JSON.stringify({ type: "partner-disconnected" }));
       ws.partner.partner = null;
-    } else if (waitingClient === ws) {
-      waitingClient = null;
     }
+    if (waitingClient === ws) waitingClient = null;
   });
 });
 
-// Use Render's dynamic port or fallback to 3000 locally
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
