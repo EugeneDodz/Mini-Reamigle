@@ -1,5 +1,5 @@
 const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-const ws = new WebSocket(`${protocol}://${window.location.host}`);
+const ws = new WebSocket(`${protocol}://${window.location.hostname}:3000`);
 
 const startBtn = document.getElementById("startBtn");
 const hangupBtn = document.getElementById("hangupBtn");
@@ -9,7 +9,7 @@ const remoteAudio = document.getElementById("remoteAudio");
 const statusText = document.getElementById("status");
 const micBar = document.getElementById("mic-bar");
 const debugLog = document.getElementById("debugLog");
-const micSelect = document.getElementById("micSelect"); // Add a <select id="micSelect"> in HTML
+const micSelect = document.getElementById("micSelect");
 
 let localStream, peerConnection;
 const servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
@@ -17,6 +17,7 @@ const servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 function logDebug(msg) {
   console.log(msg);
   debugLog.textContent += `\n${msg}`;
+  debugLog.scrollTop = debugLog.scrollHeight;
 }
 
 // ===========================
@@ -80,16 +81,6 @@ function createPeerConnection() {
 
   peerConnection.onconnectionstatechange = () => {
     logDebug("Connection state: " + peerConnection.connectionState);
-    if (peerConnection.connectionState === "connected") {
-      const audioTrack = localStream?.getAudioTracks()[0];
-      if (audioTrack) {
-        const sender = peerConnection.getSenders().find(s => s.track?.kind === "audio");
-        if (sender) {
-          sender.replaceTrack(audioTrack);
-          logDebug("Audio track re-attached.");
-        }
-      }
-    }
   };
 
   peerConnection.onicecandidate = (event) => {
@@ -178,7 +169,7 @@ function setupMicIndicator(stream) {
   const analyser = audioCtx.createAnalyser();
   const source = audioCtx.createMediaStreamSource(stream);
   const gainNode = audioCtx.createGain();
-  gainNode.gain.value = 2.0; // Boost mic gain for PC
+  gainNode.gain.value = 2.0; // Boost mic gain
 
   source.connect(gainNode);
   gainNode.connect(analyser);
@@ -202,9 +193,7 @@ document.body.addEventListener("click", () => {
   if (remoteAudio.srcObject) remoteAudio.play().catch(()=>{});
 });
 
-// ===========================
 // Debug Mic State
-// ===========================
 setInterval(() => {
   if (localStream) {
     const audioTrack = localStream.getAudioTracks()[0];

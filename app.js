@@ -1,46 +1,38 @@
-const express = require("express");
-const http = require("http");
-const { WebSocketServer } = require("ws");
-const path = require("path");
-
-const app = express();
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
-
-app.use(express.static(path.join(__dirname, "public")));
+const WebSocket = require("ws");
+const server = new WebSocket.Server({ port: 3000 });
 
 let waitingClient = null;
 
-wss.on("connection", (ws) => {
-  console.log("New client connected");
-  ws.isReady = false;
+server.on("connection", (ws) => {
+  console.log("Client connected");
 
-  ws.on("message", (message) => {
-    const data = JSON.parse(message);
+  if (!waitingClient) {
+    waitingClient = ws;
+    ws.send(JSON.stringify({ type: "waiting" }));
+  } else {
+    const partner = waitingClient;
+    waitingClient = null;
 
-    if (data.type === "ready") {
-      ws.isReady = true;
-      if (waitingClient && waitingClient.isReady) {
-        ws.partner = waitingClient;
-        waitingClient.partner = ws;
+    ws.partner = partner;
+    partner.partner = ws;
 
-        ws.send(JSON.stringify({ type: "match" }));
-        waitingClient.send(JSON.stringify({ type: "match" }));
+    ws.send(JSON.stringify({ type: "match" }));
+    partner.send(JSON.stringify({ type: "match" }));
+  }
 
-        waitingClient = null;
-      } else {
-        waitingClient = ws;
-        ws.send(JSON.stringify({ type: "waiting" }));
-      }
-    }
-    else if (["offer", "answer", "ice-candidate"].includes(data.type)) {
-      if (ws.partner) ws.partner.send(JSON.stringify(data));
+  ws.on("message", (msg) => {
+    const data = JSON.parse(msg);
+    if (ws.partner && ws.partner.readyState === WebSocket.OPEN) {
+      ws.partner.send(JSON.stringify(data));
+    } else if (data.type === "ready" && !waitingClient) {
+      waitingClient = ws;
+      ws.send(JSON.stringify({ type: "waiting" }));
     }
   });
 
   ws.on("close", () => {
     console.log("Client disconnected");
-    if (ws.partner) {
+    if (ws.partner && ws.partner.readyState === WebSocket.OPEN) {
       ws.partner.send(JSON.stringify({ type: "partner-disconnected" }));
       ws.partner.partner = null;
     }
@@ -48,5 +40,4 @@ wss.on("connection", (ws) => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+console.log("WebSocket signaling server running on ws://localhost:3000");

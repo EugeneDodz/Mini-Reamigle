@@ -1,45 +1,54 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mini Omegle</title>
-  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <h1>🎥 Mini Omegle</h1>
+  <h2>🎙 Mini Omegle - Voice Chat</h2>
+  <button id="startBtn">Start Voice Chat</button>
 
-  <div class="controls">
-    <label><input type="radio" name="mode" value="video" checked> Video Call</label>
-    <label><input type="radio" name="mode" value="audio"> Mic Only</label>
-    <br><br>
-    <label for="micSelect">🎤 Select Mic:</label>
-    <select id="micSelect"></select>
-  </div>
+  <script>
+    const startBtn = document.getElementById("startBtn");
 
-  <p id="status">Waiting...</p>
+    // Create Peer Connections (Simulating 2 devices: mobile & PC in same code for demo)
+    const pc1 = new RTCPeerConnection(); // Mobile
+    const pc2 = new RTCPeerConnection(); // PC
 
-  <div class="video-container">
-    <video id="localVideo" autoplay playsinline muted></video>
-    <video id="remoteVideo" autoplay playsinline></video>
-    <audio id="remoteAudio" autoplay></audio>
-  </div>
+    // PC: Play remote audio stream
+    pc2.ontrack = (event) => {
+      const audio = document.createElement("audio");
+      audio.srcObject = event.streams[0];
+      audio.autoplay = true;
+      document.body.appendChild(audio);
+    };
 
-  <div id="mic-level">
-    🎤 Mic Level: <span id="mic-bar">▁</span>
-  </div>
+    startBtn.addEventListener("click", async () => {
+      try {
+        // MOBILE: Get mic audio
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => pc1.addTrack(track, stream));
 
-  <div class="controls">
-    <button id="startBtn">Start Chat</button>
-    <button id="hangupBtn" disabled>Hang Up</button>
-  </div>
+        // Exchange ICE candidates (simulate signaling server)
+        pc1.onicecandidate = e => e.candidate && pc2.addIceCandidate(e.candidate);
+        pc2.onicecandidate = e => e.candidate && pc1.addIceCandidate(e.candidate);
 
-  <!-- Debug overlay -->
-  <div id="debug">
-    <h3>Debug Info</h3>
-    <pre id="debugLog">Logs will appear here...</pre>
-  </div>
+        // Create Offer from MOBILE (pc1)
+        const offer = await pc1.createOffer();
+        await pc1.setLocalDescription(offer);
+        await pc2.setRemoteDescription(offer);
 
-  <script src="script.js"></script>
+        // Create Answer from PC (pc2)
+        const answer = await pc2.createAnswer();
+        await pc2.setLocalDescription(answer);
+        await pc1.setRemoteDescription(answer);
+
+        alert("Voice Chat Started! Speak into your mobile mic.");
+      } catch (err) {
+        console.error("Error starting chat:", err);
+      }
+    });
+  </script>
 </body>
 </html>
