@@ -9,6 +9,7 @@ const remoteAudio = document.getElementById("remoteAudio");
 const statusText = document.getElementById("status");
 const micBar = document.getElementById("mic-bar");
 const debugLog = document.getElementById("debugLog");
+const micSelect = document.getElementById("micSelect"); // Add a <select id="micSelect"> in HTML
 
 let localStream, peerConnection;
 const servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
@@ -18,6 +19,9 @@ function logDebug(msg) {
   debugLog.textContent += `\n${msg}`;
 }
 
+// ===========================
+// WebSocket Signaling
+// ===========================
 ws.onmessage = async (msg) => {
   const data = JSON.parse(msg.data);
 
@@ -56,11 +60,14 @@ ws.onmessage = async (msg) => {
   }
 };
 
+// ===========================
+// Peer Connection
+// ===========================
 function createPeerConnection() {
   peerConnection = new RTCPeerConnection(servers);
 
   peerConnection.ontrack = async (event) => {
-    logDebug("Remote tracks received: " + event.streams[0].getTracks().map(t => t.kind).join(", "));
+    logDebug("Remote tracks: " + event.streams[0].getTracks().map(t => t.kind).join(", "));
     const stream = event.streams[0];
     if (event.track.kind === "video") {
       remoteVideo.srcObject = stream;
@@ -74,7 +81,6 @@ function createPeerConnection() {
   peerConnection.onconnectionstatechange = () => {
     logDebug("Connection state: " + peerConnection.connectionState);
     if (peerConnection.connectionState === "connected") {
-      // Force re-attach audio track
       const audioTrack = localStream?.getAudioTracks()[0];
       if (audioTrack) {
         const sender = peerConnection.getSenders().find(s => s.track?.kind === "audio");
@@ -100,10 +106,32 @@ function addTracksToPeer(stream) {
   });
 }
 
+// ===========================
+// Mic Device Handling
+// ===========================
+async function populateMicDevices() {
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  micSelect.innerHTML = "";
+  devices.filter(d => d.kind === "audioinput").forEach((d) => {
+    const option = document.createElement("option");
+    option.value = d.deviceId;
+    option.textContent = d.label || `Mic ${micSelect.length + 1}`;
+    micSelect.appendChild(option);
+  });
+}
+
 async function setupMedia() {
+  await populateMicDevices();
   const mode = document.querySelector('input[name="mode"]:checked').value;
+  const micDeviceId = micSelect.value;
+
   const constraints = { 
-    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    audio: { 
+      deviceId: micDeviceId ? { exact: micDeviceId } : undefined,
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true 
+    },
     video: mode === "video"
   };
 
@@ -111,7 +139,7 @@ async function setupMedia() {
   logDebug("Mic tracks: " + localStream.getAudioTracks().length);
 
   if (localStream.getAudioTracks().length === 0) {
-    alert("⚠ No mic detected!");
+    alert("⚠ No mic detected! Check browser/device settings.");
   }
 
   localVideo.srcObject = localStream;
@@ -121,6 +149,9 @@ async function setupMedia() {
   setupMicIndicator(localStream);
 }
 
+// ===========================
+// Buttons & Events
+// ===========================
 startBtn.onclick = async () => {
   await setupMedia();
   ws.send(JSON.stringify({ type: "ready" }));
@@ -139,12 +170,19 @@ function hangUp() {
   hangupBtn.disabled = true;
 }
 
-// Mic level indicator
+// ===========================
+// Mic Level Indicator
+// ===========================
 function setupMicIndicator(stream) {
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   const analyser = audioCtx.createAnalyser();
   const source = audioCtx.createMediaStreamSource(stream);
-  source.connect(analyser);
+  const gainNode = audioCtx.createGain();
+  gainNode.gain.value = 2.0; // Boost mic gain for PC
+
+  source.connect(gainNode);
+  gainNode.connect(analyser);
+
   const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
   function updateMic() {
@@ -157,6 +195,19 @@ function setupMicIndicator(stream) {
   updateMic();
 }
 
+// ===========================
+// Autoplay Unlock
+// ===========================
 document.body.addEventListener("click", () => {
   if (remoteAudio.srcObject) remoteAudio.play().catch(()=>{});
 });
+
+// ===========================
+// Debug Mic State
+// ===========================
+setInterval(() => {
+  if (localStream) {
+    const audioTrack = localStream.getAudioTracks()[0];
+    if (audioTrack) logDebug("Mic state: " + audioTrack.readyState + " | Muted: " + audioTrack.muted);
+  }
+}, 2000);

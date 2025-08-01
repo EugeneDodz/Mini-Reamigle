@@ -12,6 +12,9 @@
   <div class="controls">
     <label><input type="radio" name="mode" value="video" checked> Video Call</label>
     <label><input type="radio" name="mode" value="audio"> Mic Only</label>
+    <br><br>
+    <label for="micSelect">🎤 Select Mic:</label>
+    <select id="micSelect"></select>
   </div>
 
   <p id="status">Waiting...</p>
@@ -26,8 +29,10 @@
     🎤 Mic Level: <span id="mic-bar">▁</span>
   </div>
 
-  <button id="startBtn">Start Chat</button>
-  <button id="hangupBtn" disabled>Hang Up</button>
+  <div class="controls">
+    <button id="startBtn">Start Chat</button>
+    <button id="hangupBtn" disabled>Hang Up</button>
+  </div>
 
   <!-- Debug overlay -->
   <div id="debug">

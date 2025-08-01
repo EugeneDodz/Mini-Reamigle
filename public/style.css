@@ -1,3 +1,4 @@
+/* General Page Styling */
 body {
   font-family: Arial, sans-serif;
   text-align: center;
@@ -5,6 +6,10 @@ body {
   color: #fff;
   margin: 0;
   padding: 10px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 h1 {
@@ -12,9 +17,14 @@ h1 {
   font-size: 2.2rem;
 }
 
+/* Controls Section */
 .controls {
   margin: 15px 0;
   font-size: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
 }
 
 .controls label {
@@ -22,22 +32,43 @@ h1 {
   cursor: pointer;
 }
 
+/* Mic Selector */
+#micSelect {
+  padding: 8px;
+  font-size: 16px;
+  border-radius: 6px;
+  border: 1px solid #555;
+  background: #1f2a3c;
+  color: #fff;
+  outline: none;
+  transition: border 0.2s ease;
+}
+#micSelect:focus {
+  border: 1px solid #0f0;
+}
+
+/* Status Text */
 p#status {
   font-size: 18px;
   margin: 10px 0;
 }
 
+/* Video Container */
 .video-container {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  justify-content: center;
   align-items: center;
-  gap: 15px;
+  gap: 20px;
+  flex-wrap: wrap;
   margin-top: 15px;
+  width: 100%;
+  max-width: 900px;
 }
 
 video {
-  width: 100%;
-  max-width: 350px;
+  flex: 1 1 45%;
+  max-width: 400px;
   height: auto;
   background: #000;
   border: 2px solid #555;
@@ -45,6 +76,7 @@ video {
   box-shadow: 0 0 10px rgba(0,0,0,0.5);
 }
 
+/* Buttons */
 button {
   margin: 10px;
   padding: 12px;
@@ -68,6 +100,7 @@ button:disabled {
   cursor: not-allowed;
 }
 
+/* Mic Level Indicator */
 #mic-level {
   margin-top: 10px;
   font-size: 18px;
@@ -77,26 +110,31 @@ button:disabled {
   display: inline-block;
   color: #0f0;
   font-weight: bold;
+  font-family: monospace;
+  margin-left: 8px;
 }
 
-/* Debug panel */
+/* Debug Panel */
 #debug {
-  background: rgba(0,0,0,0.7);
+  background: rgba(0, 0, 0, 0.85);
   color: #0f0;
   font-size: 14px;
   position: fixed;
   bottom: 0;
   left: 0;
   width: 100%;
-  max-height: 150px;
+  max-height: 180px;
   overflow-y: auto;
   border-top: 1px solid #333;
   text-align: left;
-  padding: 8px;
+  padding: 8px 12px;
+  box-sizing: border-box;
 }
 
 #debug h3 {
   margin: 0 0 5px;
   font-size: 16px;
   color: #fff;
+  border-bottom: 1px solid #333;
+  padding-bottom: 4px;
 }
