@@ -56,8 +56,8 @@ ws.onmessage = async (msg) => {
   } 
   else if (data.type === "partner-disconnected") {
     statusText.textContent = "Partner disconnected. Returning to waiting...";
-    hangUp();
-    ws.send(JSON.stringify({ type: "ready" }));
+    hangUp(false); // Cleanup but don't notify server again
+    ws.send(JSON.stringify({ type: "ready" })); // Auto rejoin waiting
   }
 };
 
@@ -151,14 +151,33 @@ startBtn.onclick = async () => {
   statusText.textContent = "Connecting...";
 };
 
-hangupBtn.onclick = hangUp;
-function hangUp() {
-  if (peerConnection) peerConnection.close();
+// ✅ Hangup with server notification
+hangupBtn.onclick = () => {
+  ws.send(JSON.stringify({ type: "hangup" }));
+  hangUp(true);
+};
+
+function hangUp(notify = true) {
+  if (peerConnection) {
+    peerConnection.close();
+    peerConnection = null;
+  }
+
+  // Stop local media tracks
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
+  }
+
+  // Reset UI
   remoteVideo.srcObject = null;
   remoteAudio.srcObject = null;
+  localVideo.srcObject = null;
   statusText.textContent = "Call ended.";
   startBtn.disabled = false;
   hangupBtn.disabled = true;
+
+  logDebug("✅ Call ended and cleaned up.");
 }
 
 // ===========================
