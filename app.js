@@ -1,9 +1,23 @@
+const express = require("express");
+const http = require("http");
 const WebSocket = require("ws");
-const server = new WebSocket.Server({ port: 3000 });
+const path = require("path");
+
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+// Serve static files (HTML/JS/CSS)
+app.use(express.static(path.join(__dirname, "public")));
+
+// ✅ Handle root route to serve index.html
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
 let waitingClient = null;
 
-server.on("connection", (ws) => {
+wss.on("connection", (ws) => {
   console.log("Client connected");
 
   if (!waitingClient) {
@@ -12,7 +26,6 @@ server.on("connection", (ws) => {
   } else {
     const partner = waitingClient;
     waitingClient = null;
-
     ws.partner = partner;
     partner.partner = ws;
 
@@ -40,4 +53,5 @@ server.on("connection", (ws) => {
   });
 });
 
-console.log("WebSocket signaling server running on ws://localhost:3000");
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
